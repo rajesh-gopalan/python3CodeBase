@@ -1172,45 +1172,45 @@ def getBins(rowVal):
         binVal = 'NA';
     return binVal;
 
-# Create a chart for age of sellers on hold.
-def getAgeChart(debug_flag, yearNum, sellersDf, chartFileName):
+# Create a chart for age of Attr1 based on Attr Val1.
+def getAgeChart(debug_flag, yearNum, valDf, chartFileName):
     if debug_flag == 1:
         print('### Start: getAgeChart function ###');
 
-    holdValDf = sellersDf[sellersDf['<Attr 1>'] >= date(yearNum, 2, 1)]
-    holdValDf = holdValDf[holdValDf['<Attr 1>'] < date(yearNum + 1, 2, 1)]
+    attrValDf = valDf[valDf['<Attr 1>'] >= date(yearNum, 2, 1)]
+    attrValDf = attrValDf[attrValDf['<Attr 1>'] < date(yearNum + 1, 2, 1)]
     
-    holdValDf = holdValDf[['<Attr 1>', '<Attr 2>']]
-    holdValDf['Hold Bin'] = holdValDf.apply(getBins,
-                                            axis = 1
-                                            )
-    holdValDf['< 7 days']    = (holdValDf['Hold Bin'] == '< 7 days')  * 1
-    holdValDf['7 - 14 days'] = (holdValDf['Hold Bin'] == '7 - 14 days') * 1
-    holdValDf['> 14 days']   = (holdValDf['Hold Bin'] == '> 14 days')  * 1
+    attrValDf = attrValDf[['<Attr 1>', '<Attr 2>']]
+    attrValDf['<Attr Bin>'] = attrValDf.apply(getBins,
+                                              axis = 1
+                                              )
+    attrValDf['<Bin Val1>'] = (attrValDf['<Attr Bin>'] == '<Bin Val1>') * 1
+    attrValDf['<Bin Val2>'] = (attrValDf['<Attr Bin>'] == '<Bin Val2>') * 1
+    attrValDf['<Bin Val3>'] = (attrValDf['<Attr Bin>'] == '<Bin Val3>') * 1
     
-    holdBinDf = holdValDf[['Hold Bin',
-                           '< 7 days',
-                           '7 - 14 days',
-                           '> 14 days'
+    attrBinDf = attrValDf[['<Attr Bin>',
+                           '<Bin Val1>',
+                           '<Bin Val2>',
+                           '<Bin Val3>'
                            ]
-                          ].pivot_table(values = ['< 7 days',
-                                                  '7 - 14 days',
-                                                  '> 14 days'
+                          ].pivot_table(values = ['<Bin Val1>',
+                                                  '<Bin Val2>',
+                                                  '<Bin Val3>'
                                                   ],
-                            index = ['Hold Bin'],
+                            index = ['<attr Bin>'],
                             fill_value = 0,
                             aggfunc = np.sum
                             )
     
-    chartDf = pd.DataFrame({'Age' : [holdBinDf.ix[0].sum(),
-                                     holdBinDf.ix[1].sum(),
-                                     holdBinDf.ix[2].sum()
+    chartDf = pd.DataFrame({'Age' : [attrBinDf.ix[0].sum(),
+                                     attrBinDf.ix[1].sum(),
+                                     attrBinDf.ix[2].sum()
                                      ]
                             }
                            )
     xTicks  = list(range(len(chartDf)))
     # xLabels = list(chartDf.index.values)
-    xLabels = ['< 7 days', '7 - 14 days', '> 14 days']
+    xLabels = ['<Bin Val1>', '<Bin Van2>', '<Bin Val3>']
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -1231,7 +1231,7 @@ def getAgeChart(debug_flag, yearNum, sellersDf, chartFileName):
     ax.set_xticklabels(xLabels,
                        rotation = 0
                        )
-    plt.title('Age of Holds (' + str(chartDf['Age'].sum()) + ' On Hold)')
+    plt.title('Age of Attr (' + str(chartDf['Age'].sum()) + ' On <Attr>)')
     
     plt.xlabel('')
     plt.ylabel('')
@@ -1249,585 +1249,16 @@ def getAgeChart(debug_flag, yearNum, sellersDf, chartFileName):
     if debug_flag == 1:
         print('### End: getAgeChart function ###');
 
-def getHoldStats(debug_flag, yearNum, fileNamesDf, svFileName, chartFileName, holdFileName):
-    if debug_flag == 1:
-        print('### Start: getHoldStats function ###');
-
-    holdDf     = pd.DataFrame()
-    holdAggDf  = pd.DataFrame()
-
-    if debug_flag == 1:
-        print('Reading in processed SV csv file.');
-    svCsvFileDf = pd.read_csv(svFileName,
-                              header = 0
-                              )
-
-    if debug_flag == 1:
-        print('Reading in multiple SV files and storing in a dataframe.');
-    indivDf    = (pd.read_csv(eachFile,
-                              header = 0
-                              ) for eachFile in fileNamesDf['Name']
-                  )
-    stitchedDf = pd.concat(indivDf,
-                           ignore_index = True
-                           )
-    stitchedDf['Incident Date Created'] = pd.to_datetime(stitchedDf['Incident Date Created'])
-
-    if debug_flag == 1:
-        print('Filtering the data for the year under consideration: ' + str(yearNum) + '.');
-    stitchedDf = stitchedDf[stitchedDf['Incident Date Created'] >= datetime(yearNum, 2, 1)]
-    stitchedDf = stitchedDf[stitchedDf['Incident Date Created'] < datetime(yearNum + 1, 2, 1)]
-
-    if debug_flag == 1:
-        print('Creating a dataframe for Hold decisions.');
-    holdDf = stitchedDf[stitchedDf['Decision'] == 'Hold']
-    holdDf = holdDf.sort_values(by = 'Incident Date Created')
-    holdDf['Incident Date Created'] = holdDf['Incident Date Created'].apply(convDateTimeToDate)
-    holdDf['Date Range'] = pd.to_datetime(holdDf['Incident Date Created']).apply(weekDateUpdate)
-    holdDf['FY Wk #']    = pd.to_datetime(holdDf['Incident Date Created']).apply(weekNumUpdate)
-    holdDf = holdDf[['Decision',
-                     'Incident Date Created',
-                     'Reference #',
-                     'FY Wk #',
-                     'Partner Business Full Name'
-                     ]
-                    ]
-    holdDf['# of Holds'] = (holdDf['Decision'] == 'Hold')  * 1
-    if debug_flag == 1:
-        print('Creating a chart for Hold distributions.');
-    holdDf = holdDf.drop_duplicates(subset = ['FY Wk #',
-                                              'Reference #'
-                                              ],
-                                    keep = 'first'
-                                    )
-    holdAgg1Df = holdDf[['Incident Date Created',
-                         'FY Wk #'
-                         ]
-                        ].drop_duplicates(subset = 'FY Wk #',
-                                          keep = 'first'
-                                          )
-    holdAgg2Df = holdDf[['FY Wk #',
-                         '# of Holds'
-                         ]
-                        ].pivot_table(values = ['# of Holds'],
-                                      index  = ['FY Wk #'],
-                                      aggfunc = np.sum
-                                      )
-    holdAgg2Df['FY Wk #'] = holdAgg2Df.index
-    holdAggDf = holdAgg1Df.merge(holdAgg2Df,
-                                 how = 'outer',
-                                 on = 'FY Wk #'
-                                 )
-    holdAggDf['Incident Date Created'] = pd.to_datetime(holdAggDf['Incident Date Created'])
-    holdAggDf = holdAggDf.sort_values(by = 'Incident Date Created')
-    if int(holdAggDf[-1:]['FY Wk #']) != weekNumUpdate(datetime.strptime(todayFormattedDate,
-                                                                         '%m-%d-%Y'
-                                                                         ).date()
-                                                       ):
-        holdAggDf = pd.concat([holdAggDf,
-                               pd.DataFrame([(datetime.strptime(todayFormattedDate, '%m-%d-%Y'),
-                                              weekNumUpdate(datetime.strptime(todayFormattedDate,
-                                                                              '%m-%d-%Y'
-                                                                              ).date()
-                                                            ),
-                                              0
-                                              )
-                                             ],
-                                            columns = ['Incident Date Created',
-                                                       'FY Wk #',
-                                                       '# of Holds'
-                                                       ]
-                                            )
-                               ],
-                               axis = 0
-                              );
-
-    mergedDf = holdAggDf.merge(svCsvFileDf,
-                               how = 'outer',
-                               on  = 'FY Wk #'
-                               )
-    mergedDf['Hold %'] = (mergedDf['# of Holds'] / mergedDf['TnS Reviewed']) * 100
-
-    weeklyHoldTrendColors = ['#519adb',
-                             '#ed7a28'
-                             ]
-    xTicks  = mergedDf.sort_values('FY Wk #')['FY Wk #'].tolist()
-    xLabels = mergedDf.sort_values('FY Wk #')['FY Wk #'].apply(addWkText).tolist()
-
-    fig = plt.figure()
-    ax1 = fig.add_subplot(111)
-    ax1.bar(mergedDf['FY Wk #'].tolist(),
-            mergedDf['# of Holds'].tolist(),
-            color = weeklyHoldTrendColors[0],
-            label = '# of Holds',
-            width = 0.4
-            )
-    ax1.set_xlabel('')
-    ax1.set_xticks(xTicks)
-    ax1.set_xticklabels(xLabels,
-                        rotation = 90
-                        )
-    ax1.set_facecolor('w')
-    ax1.legend(loc = 'upper center',
-               bbox_to_anchor = (0.05,
-                                 -0.2
-                                 ),
-               ncol = 1
-               )
-
-    # Create another axes that shares the same x-axis as ax1.
-    ax2 = ax1.twinx()
-    ax2.plot(mergedDf['FY Wk #'],
-             mergedDf['Hold %'],
-             color = weeklyHoldTrendColors[1]
-             )
-
-    ax2.set_ylabel('%')
-    ax2.set_yticks(np.arange(0, 31, 5))
-    ax2.legend(loc = 'upper center',
-               bbox_to_anchor = (0.95,
-                                 -0.2
-                                 ),
-               ncol = 1
-               )
-    ax2.set_facecolor('w')
-    ax2.grid(None)
-    ax2.spines['bottom'].set_color('k')
-    ax2.spines['right'].set_color('k')
-    ax2.spines['left'].set_color('k')
-
-    plt.grid(False)
-    plt.title('Weekly Hold Trend')
-    fig.patch.set_facecolor('w')
-    plt.tight_layout()
-    fig.savefig(chartFileName,
-                dpi = 1200,
-                bbox_inches = 'tight',
-                pad_inches = 0.25
-                )
-
-    if debug_flag == 1:
-        print('Writing the hold data to a tab-delimited file.');
-    mergedDf.to_csv(holdFileName,
-                    sep = '\t',
-                    index = False
-                    )
-    if debug_flag == 1:
-        print('Calculating number of days in Hold.');
-    resultDf = stitchedDf[stitchedDf['Reference #'].isin(holdDf['Reference #'])]
-    resultDf = resultDf[((resultDf['Decision'] == 'Allowed') |
-                         (resultDf['Decision'] == 'Declined')
-                         ) &
-                        (resultDf['Status'] == 'Completed')
-                        ]
-    resultDf['Incident Date Closed'] = pd.to_datetime(resultDf['Incident Date Closed'])
-    resultDf = resultDf.sort_values(by = 'Incident Date Closed')
-    resultDf['Incident Date Closed'] = resultDf['Incident Date Closed'].apply(convDateTimeToDate)
-    resultDf.drop_duplicates(subset = ['Reference #'],
-                             keep = 'last',
-                             inplace = True
-                             )
-    resultDf = resultDf[['Reference #',
-                         'Incident Date Closed'
-                         ]
-                        ]
-    resultDf = resultDf.merge(holdDf,
-                              how = 'outer',
-                              on  = 'Reference #'
-                              )
-    resultDf = resultDf[~resultDf['Incident Date Closed'].isnull()]
-    resultDf['Days On Hold'] = resultDf.apply(numDaysDiff,
-                                              axis = 1
-                                              )
-
-    if debug_flag == 1:
-        print('### End: getHoldStats function ###');
-    return resultDf;
-
-def genSvDaysChart(debug_flag, reportFileDf, holdSvDf, chartFileName, startWeekNum, endWeekNum, monthlyReport):
-    if debug_flag == 1:
-        print('### Start: genSvDaysChart function ###');
-
-    # Stats for Overall:
-    reportFileH1A1Df = reportFileDf.copy()
-    reportFileH1A1Df['Resolution Days']  = reportFileH1A1Df[['Incident Date Created',
-                                                             'Incident Date Closed'
-                                                             ]
-                                                            ].apply(daysDiff,
-                                                                    axis = 1
-                                                                    )
-    rowIndex          = reportFileH1A1Df.groupby('FY Wk #')['Decision'].count().index
-    weekNumDf         = pd.DataFrame(reportFileH1A1Df['FY Wk #'].unique())
-    weekNumDf.index   = rowIndex
-    dateRangeDf       = pd.DataFrame(reportFileH1A1Df['Date Range'].unique())
-    dateRangeDf.index = rowIndex
-    resultFileH1A1Df  = pd.concat([weekNumDf,
-                                   dateRangeDf,
-                                   (reportFileH1A1Df[['FY Wk #', 'Resolution Days']].groupby('FY Wk #', sort = False).mean()),
-                                   ],
-                                  axis = 1,
-                                  join_axes = [rowIndex]
-                                  )
-    resultFileH1A1Df.columns = ['FY Wk #',
-                                'Date Range',
-                                'Overall'
-                                ]
-    
-    # Stats for Manual + Hold:
-    # Remove rows related to 'Auto Allow'.
-    reportFileH1A0Df  = reportFileDf.copy()
-    reportFileH1A0Df  = reportFileH1A0Df[~((reportFileH1A0Df['Decision'] == 'Allowed') & (reportFileH1A0Df['Assigned Account'] == 'No Value'))]
-    reportFileH1A0Df['Resolution Days']  = reportFileH1A0Df[['Incident Date Created',
-                                                             'Incident Date Closed'
-                                                             ]
-                                                            ].apply(daysDiff,
-                                                                    axis = 1
-                                                                    )
-    rowIndex          = reportFileH1A0Df.groupby('FY Wk #')['Decision'].count().index
-    weekNumDf         = pd.DataFrame(reportFileH1A0Df['FY Wk #'].unique())
-    weekNumDf.index   = rowIndex
-    dateRangeDf       = pd.DataFrame(reportFileH1A0Df['Date Range'].unique())
-    dateRangeDf.index = rowIndex
-    resultFileH1A0Df  = pd.concat([weekNumDf,
-                                   dateRangeDf,
-                                   (reportFileH1A0Df[['FY Wk #', 'Resolution Days']].groupby('FY Wk #', sort = False).mean()),
-                                   ],
-                                  axis = 1,
-                                  join_axes = [rowIndex]
-                                  )
-    resultFileH1A0Df.columns = ['FY Wk #',
-                                'Date Range',
-                                'Manual + Hold'
-                                ]
-    
-    # Stats for Manual Only:
-    reportFileH0A0Df  = reportFileDf.copy()
-    reportFileH0A0Df  = reportFileH0A0Df[~reportFileH0A0Df['Reference #'].isin(holdSvDf['Reference #'])]
-    reportFileH0A0Df  = reportFileH0A0Df[~((reportFileH0A0Df['Decision'] == 'Allowed') & (reportFileH0A0Df['Assigned Account'] == 'No Value'))]
-    reportFileH0A0Df['Resolution Days']  = reportFileH0A0Df[['Incident Date Created',
-                                                             'Incident Date Closed'
-                                                             ]
-                                                            ].apply(daysDiff,
-                                                                    axis = 1
-                                                                    )
-    rowIndex          = reportFileH0A0Df.groupby('FY Wk #')['Decision'].count().index
-    weekNumDf         = pd.DataFrame(reportFileH0A0Df['FY Wk #'].unique())
-    weekNumDf.index   = rowIndex
-    dateRangeDf       = pd.DataFrame(reportFileH0A0Df['Date Range'].unique())
-    dateRangeDf.index = rowIndex
-    resultFileH0A0Df  = pd.concat([weekNumDf,
-                                   dateRangeDf,
-                                   (reportFileH0A0Df[['FY Wk #', 'Resolution Days']].groupby('FY Wk #', sort = False).mean()),
-                                   ],
-                                  axis = 1,
-                                  join_axes = [rowIndex]
-                                  )
-    resultFileH0A0Df.columns = ['FY Wk #',
-                                'Date Range',
-                                'Manual Only'
-                                ]
-
-    # Stats for Hold Only:
-    holdFileDf = holdSvDf.copy()
-    holdFileDf['Incident Date Created'] = pd.to_datetime(holdFileDf['Incident Date Created'])
-    holdFileDf['Incident Date Closed']  = pd.to_datetime(holdFileDf['Incident Date Closed'])
-    holdFileDf['Date Range'] = holdFileDf['Incident Date Created'].apply(weekDateUpdate)
-    holdFileDf['FY Wk #']    = holdFileDf['Incident Date Created'].apply(weekNumUpdate)
-    holdFileDf['FY Wk #']    = pd.to_numeric(holdFileDf['FY Wk #'],
-                                               errors = 'coerce'
-                                               )
-    holdFileDf['Resolution Days']  = holdFileDf[['Incident Date Created',
-                                                 'Incident Date Closed'
-                                                 ]
-                                                ].apply(daysDiff,
-                                                        axis = 1
-                                                        )
-    rowIndex          = holdFileDf.groupby('FY Wk #')['Decision'].count().index
-    weekNumDf         = pd.DataFrame(holdFileDf['FY Wk #'].unique())
-    weekNumDf.index   = rowIndex
-    dateRangeDf       = pd.DataFrame(holdFileDf['Date Range'].unique())
-    dateRangeDf.index = rowIndex
-    holdFileDf        = pd.concat([weekNumDf,
-                                   dateRangeDf,
-                                   (holdFileDf[['FY Wk #',
-                                                'Resolution Days'
-                                                ]
-                                               ].groupby('FY Wk #',
-                                                         sort = False
-                                                         ).mean()
-                                    ),
-                                   ],
-                                  axis = 1,
-                                  join_axes = [rowIndex]
-                                  )
-    holdFileDf.columns = ['FY Wk #',
-                          'Date Range',
-                          'Hold Only'
-                          ]
-
-    resultFileDf = holdFileDf.merge(resultFileH1A0Df,
-                                    how = 'outer',
-                                    on = ['Date Range',
-                                          'FY Wk #'
-                                          ]
-                                    )
-    resultFileDf = resultFileDf.merge(resultFileH0A0Df,
-                                      how = 'outer',
-                                      on = ['Date Range',
-                                            'FY Wk #'
-                                            ]
-                                      )
-    resultFileDf = resultFileDf.merge(resultFileH1A1Df,
-                                      how = 'outer',
-                                      on = ['Date Range',
-                                            'FY Wk #'
-                                            ]
-                                      )
-
-    if monthlyReport == 1:
-        resultFileDf = resultFileDf[resultFileDf['FY Wk #'] >= startWeekNum]
-        resultFileDf = resultFileDf[resultFileDf['FY Wk #'] <= endWeekNum];
-
-    resultFileDf.index = range(len(resultFileDf))
-
-    xTicks  = list(range(len(resultFileDf)))
-    xLabels = resultFileDf.sort_values('FY Wk #')['FY Wk #'].apply(addWkText).tolist()
-
-    yTicks  = list(range(int(max(holdFileDf['Hold Only'].tolist()))))
-    yTicks  = yTicks[1::2]
-    yTicks.append(yTicks[-1] + yTicks[-1] - yTicks[-2])
-    yTicks.append(yTicks[-1] + yTicks[-1] - yTicks[-2])
-
-    lineColors = ['red',
-                  'orange',
-                  'blue',
-                  'green'
-                  ]
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    resultFileDf[['Hold Only',
-                  'Manual + Hold',
-                  'Manual Only',
-                  'Overall'
-                  ]
-                 ].plot(ax = ax,
-                        color = lineColors,
-                        style = '-'
-                        )
-    ax.set_xticks(xTicks)
-    # ax.set_xticklabels(xLabels,
-    #                    rotation = 90
-    #                    )
-    if startWeekNum == 0 & endWeekNum == 0:
-        ax.set_xticklabels(xLabels,
-                           rotation = 90
-                           )
-    else:
-        ax.set_xticklabels(xLabels,
-                           rotation = 0
-                           )
-    ax.set_facecolor('w')
-    ax.spines['bottom'].set_color('k')
-    ax.spines['left'].set_color('k')
-    ax.legend(loc = 'upper center',
-              bbox_to_anchor = (0.5,
-                                -0.2
-                                ),
-              ncol = 4
-              )
-    plt.yticks(yTicks,
-               yTicks
-               )
-    plt.title('Avg. Vetting Time (Days)')
-    plt.xlabel('')
-    plt.ylabel('')
-    plt.axhline(y = 3.0,
-                color = 'k',
-                linestyle = 'dotted',
-                linewidth = 1
-                )
-    plt.grid(False)
-    plt.tight_layout()
-    plt.savefig(chartFileName,
-                dpi = 1200,
-                bbox_inches = 'tight',
-                pad_inches = 0.25,
-                facecolor = 'w',
-                transparent = True
-                )
-
-    if debug_flag == 1:
-        print('### End: genSvDaysChart function ###');
-    return resultFileDf;
-
-# Create a chart for seller vetting summary.
-def genSvSummaryCharts(debug_flag, reviewFileDf, chart1FileName, chart2FileName, startWeekNum, endWeekNum, monthlyReport):
-    if debug_flag == 1:
-        print('### Start: genSvSummaryCharts function ###');
-
-    if monthlyReport == 1:
-        reviewFileDf = reviewFileDf[reviewFileDf['FY Wk #'] >= startWeekNum]
-        reviewFileDf = reviewFileDf[reviewFileDf['FY Wk #'] <= endWeekNum];
-    
-    xTicks  = reviewFileDf.sort_values('FY Wk #')['FY Wk #'].tolist()
-    xLabels = reviewFileDf.sort_values('FY Wk #')['FY Wk #'].apply(addWkText).tolist()
-
-    yTicks  = list(range(int(max(reviewFileDf['TnS Reviewed'].tolist()))))
-    yTicks  = yTicks[0::50]
-    yTicks.append(yTicks[-1] + yTicks[-1] - yTicks[-2])
-
-    barColors = ['#519adb',
-                 '#ed7a28'
-                 ]
-    barColors1 = ['#FFD700',
-                  '#9400D3']
-
-    # No. of Sellers reviewed by TnS.
-    fig1 = plt.figure()
-    ax1  = fig1.add_subplot(111)
-    ax1.bar(xTicks,
-            reviewFileDf['TnS Allowed'].tolist(),
-            width = 0.4,
-            label = 'Allowed',
-            color = barColors1[1]
-            )
-    ax1.bar(xTicks,
-            reviewFileDf['TnS Declined'].tolist(),
-            bottom = reviewFileDf['TnS Allowed'].tolist(),
-            width = 0.4,
-            label = 'Declined',
-            color = barColors1[0]
-            )
-    ax1.set_xticks(xTicks)
-    # ax1.set_xticklabels(xLabels,
-    #                     rotation = 90
-    #                     )
-    if startWeekNum == 0 & endWeekNum == 0:
-        ax1.set_xticklabels(xLabels,
-                            rotation = 90
-                            )
-    else:
-        ax1.set_xticklabels(xLabels,
-                            rotation = 0
-                            )
-    ax1.set_facecolor('w')
-    ax1.spines['bottom'].set_color('k')
-    ax1.spines['left'].set_color('k')
-    ax2 = fig1.add_subplot(111)
-    ax2.axhline(y = 250,
-                color = 'k',
-                linestyle = 'dotted',
-                label = 'Business Target',
-                linewidth = 1
-                )
-    ax2.legend(loc = 'upper center',
-               bbox_to_anchor = (0.5,
-                                 -0.2
-                                 ),
-               ncol = 3
-               )
-    plt.yticks(yTicks,
-               yTicks
-               )
-    plt.title('# of Sellers Reviewed - Allowed vs Declined')
-    plt.xlabel('')
-    plt.ylabel('')
-    plt.grid(False)
-    plt.tight_layout()
-    plt.savefig(chart1FileName,
-                dpi = 1200,
-                bbox_inches = 'tight',
-                pad_inches = 0.25,
-                facecolor = 'w',
-                transparent = True
-                )
-
-    # Auto Review vs. Manual Review
-    fig2 = plt.figure()
-    ax1 = fig2.add_subplot(111)
-    ax1.bar(xTicks,
-            reviewFileDf['Auto Reviewed'].tolist(),
-            width = 0.4,
-            label = 'Auto Reviewed',
-            color = barColors[0]
-            )
-    ax1.bar(xTicks,
-            reviewFileDf['Manually Reviewed'].tolist(),
-            bottom = reviewFileDf['Auto Reviewed'].tolist(),
-            width = 0.4,
-            label = 'Manually Reviewed',
-            color = barColors[1]
-            )
-    ax1.set_xlabel('')
-    ax1.set_xticks(xTicks)
-    # ax1.set_xticklabels(xLabels,
-    #                     rotation = 90
-    #                     )
-    if startWeekNum == 0 & endWeekNum == 0:
-        ax1.set_xticklabels(xLabels,
-                            rotation = 90
-                            )
-    else:
-        ax1.set_xticklabels(xLabels,
-                            rotation = 0
-                            )
-    ax1.set_yticks(yTicks,
-                   yTicks
-                   )
-    ax1.set_facecolor('w')
-    ax1.legend(loc = 'upper center',
-               bbox_to_anchor = (0.25,
-                                 -0.2
-                                 ),
-               ncol = 2
-               )
-
-    reviewFileDf['Auto Allow %'] = (reviewFileDf['Auto Reviewed'] / reviewFileDf['TnS Reviewed']) * 100
-    ax2 = ax1.twinx()
-    ax2.plot(xTicks,
-             reviewFileDf['Auto Allow %'],
-             color = barColors[0]
-             )
-    ax2.set_ylabel('%')
-    ax2.set_yticks(np.arange(0, 101, 20))
-    ax2.legend(loc = 'upper center',
-               bbox_to_anchor = (0.95,
-                                 -0.2
-                                 ),
-               ncol = 1
-               )
-    ax2.set_facecolor('w')
-    ax2.spines['bottom'].set_color('k')
-    ax2.spines['right'].set_color('k')
-    ax2.spines['left'].set_color('k')
-
-    plt.title('# of Sellers Reviewed - Auto vs Manual')
-    plt.xlabel('')
-    plt.ylabel('(%)')
-    plt.grid(False)
-    plt.tight_layout()
-    plt.savefig(chart2FileName,
-                dpi = 1200,
-                bbox_inches = 'tight',
-                pad_inches = 0.25,
-                facecolor = 'w',
-                transparent = True
-                )
-
-    if debug_flag == 1:
-        print('### End: genSvSummaryCharts function ###');
-
 def getEarliestIncidentDate(debug_flag):
-    muFileNames = glob.glob(os.path.join(MUPATH, "*/*."))
-    abFileNames = glob.glob(os.path.join(ABPATH, "*/*.txt"))
+    path1FileNames = glob.glob(os.path.join(<PATH1>, "*/*."))
+    path2FileNames = glob.glob(os.path.join(<PATH2>, "*/*.txt"))
     if debug_flag == 1:
         print('Reading in the individual files.')
     indivDf = (pd.read_csv(eachFile,
                            header = 0,
                            sep = '\t'
-                           ) for eachFile in [muFileNames,
-                                              abFileNames
+                           ) for eachFile in [path1FileNames,
+                                              path2FileNames
                                               ]
                )
     if debug_flag == 1:
@@ -1835,508 +1266,10 @@ def getEarliestIncidentDate(debug_flag):
     stitchedDf = pd.concat(indivDf,
                            ignore_index = True
                            )
-    earliestDate = pd.to_datetime(stitchedDf['Date Created'].sort_values(['Date Created'])[0])
+    earliestDate = pd.to_datetime(stitchedDf['<Date Attr>'].sort_values(['<Date Attr>'])[0])
     if debug_flag == 1:
-        print('Earliest "Date Created" is ' + earliestDate + '.');
+        print('Earliest "<Date Attr>" is ' + earliestDate + '.');
     return earliestDate;
-
-def prepIncidentsFileV1(debug_flag, monthVal, incidentsFile, reportFile):
-    if debug_flag == 1:
-        print('### Start: prepIncidentsFileV1 function ###');
-
-    if monthVal == 'Pending Incidents':
-        # Pre-processing the pending incidents  and storing them in a data frame.
-        if debug_flag == 1:
-            print('Pre-processing the pending incidents and storing them in a data frame.');
-        incidentsDf = preProcessIncidents(debug_flag,
-                                          monthVal,
-                                          incidentsFile
-                                          )
-        
-        if debug_flag == 1:
-            print('Adding new attributes to pending incidents and creating a pending report file.');
-        incidentsDf = addNewAttributes(debug_flag,
-                                       incidentsDf,
-                                       reportFile
-                                       )
-        incidentsDf.index = range(len(incidentsDf))
-        if debug_flag == 1:
-            print('Length = ' + str(len(incidentsDf)));
-        
-        # Processing the downloaded report to parse BPM status from the Subject column.
-        # Example data in the Subject column: 48630947 - Outfitter Country [REVIEW]
-        # BPM Status = REVIEW.
-        if debug_flag == 1:
-            print('Processing the pending report to parse BPM status from the Subject column.');
-        incidentsDf['BPM Status'] = incidentsDf['Subject'].apply(bpmStatus);
-    else:
-        # Reading in and storing incidents from Nov into a dataframe.
-        if debug_flag == 1:
-            print('Reading in and storing incidents from Nov into a dataframe.');
-        novRIncidentsDf = pd.read_csv(novRIncidentsFile,
-                                      header = 0,
-                                      sep = '\t',
-                                      index_col = False
-                                      )
-        # Reading in and storing incidents from Dec into a dataframe.
-        if debug_flag == 1:
-            print('Reading in and storing incidents from Dec into a dataframe.');
-        decRIncidentsDf = pd.read_csv(decRIncidentsFile,
-                                      header = 0,
-                                      sep = '\t',
-                                      index_col = False
-                                      )
-        # Reading in and storing incidents from Jan into a dataframe.
-        if debug_flag == 1:
-            print('Reading in and storing incidents from Jan into a dataframe.');
-        janRIncidentsDf = pd.read_csv(janRIncidentsFile,
-                                      header = 0,
-                                      sep = '\t',
-                                      index_col = False
-                                      )
-
-        # Reading in and storing incidents from Jan into a dataframe.
-        if debug_flag == 1:
-            print('Reading in and storing incidents from ' + '{0:%b}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date().replace(day = 1) - timedelta(days = 1)) + ' into a dataframe.');
-        febRIncidentsDf = pd.read_csv(prevMonthIncidentsFile,
-                                      header = 0,
-                                      sep = '\t',
-                                      index_col = False
-                                      )
-
-        # Stitching together the current month's AUTO BLOCK incident files.
-        if debug_flag == 1:
-            print('Stitching together the ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' AUTO BLOCK incident files.');
-        filePath = ITDFDIR + 'AUTO BLOCK/' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + '/'
-        abIncidentsFile = ITDFDIR + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + '/TnS_Analytics_Items_AUTO_BLOCK ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' 2017.txt'
-        stitchDataFiles(debug_flag, filePath, abIncidentsFile)
-
-        # Stitching together the current month's MANUAL UPDATES incident files.
-        if debug_flag == 1:
-            print('Stitching together the ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' MANUAL UPDATES incident files.');
-        filePath = ITDFDIR + 'MANUAL UPDATES/' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + '/'
-        muIncidentsFile = ITDFDIR + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + '/TnS_Analytics_Items_MANUAL_UPDATES ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' 2017.txt'
-        stitchDataFiles(debug_flag, filePath, muIncidentsFile)
-        
-        # Stitching together all incidents from the current month.
-        if debug_flag == 1:
-            print('Stitching together all incidents from ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + '.');
-        filePath = ITDFDIR + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + '/'
-        stitchDataFiles(debug_flag, filePath, incidentsFile)
-
-        stitchedDf = pd.read_csv(incidentsFile,
-                                 sep = '\t',
-                                 header = 0,
-                                 index_col = False
-                                 )
-        stitchedDf.index = range(len(stitchedDf))
-
-        # Pre-processing the current month's incidents  and storing them in a data frame.
-        if debug_flag == 1:
-            print('Pre-processing ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' incidents and storing them in a data frame.');
-        preProcIncidentsDf = preProcessIncidents(debug_flag,
-                                                 stitchedDf
-                                                 )
-        
-        if debug_flag == 1:
-            print('Adding new attributes to ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' incidents and creating a pending report file.');
-        marRIncidentsDf = addNewAttributes(debug_flag,
-                                           preProcIncidentsDf
-                                           )
-        marRIncidentsDf.index = range(len(marRIncidentsDf))
-        if debug_flag == 1:
-            print('Length of incidents in ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' = ' + str(len(marRIncidentsDf)));
-        
-        # Concatenating the cumulative incidents into a dataframe.
-        if debug_flag == 1:
-            print('Concatenating the cumulative incidents into a dataframe.');
-        incidentsDf = pd.concat([novRIncidentsDf,
-                                 decRIncidentsDf,
-                                 janRIncidentsDf,
-                                 febRIncidentsDf,
-                                 marRIncidentsDf
-                                 ],
-                                 axis = 0
-                                )
-        incidentsDf.index = range(len(incidentsDf))
-        if debug_flag == 1:
-            print('Concatenation complete.')
-            print('Length = ' + str(len(incidentsDf)));
-        
-        # Processing the downloaded report to parse BPM status from the Subject column.
-        # Example data in the Subject column: 48630947 - Outfitter Country [REVIEW]
-        # BPM Status = REVIEW.
-        if debug_flag == 1:
-            print('Processing the downloaded report to parse BPM status from the Subject column.');
-        incidentsDf['BPM Status'] = incidentsDf['Subject'].apply(bpmStatus);
-
-    if debug_flag == 1:
-        print('### End: prepIncidentsFileV1 function ###')
-    return incidentsDf;
-
-def prepPendingIncidentsFile(debug_flag, incidentsFile):
-    if debug_flag == 1:
-        print('### Start: prepPendingIncidentsFile function ###');
-
-    incidentsFileDf = pd.read_csv(incidentsFile,
-                                  sep = '\t'
-                                  )
-
-    # Pre-processing the pending incidents  and storing them in a data frame.
-    if debug_flag == 1:
-        print('Pre-processing the pending incidents and storing them in a data frame.');
-    preProcIncidentsDf = preProcessIncidents(debug_flag,
-                                             incidentsFileDf
-                                             )
-    
-    if debug_flag == 1:
-        print('Adding new attributes to pending incidents and creating a pending report file.');
-    incidentsDf = addNewAttributes(debug_flag,
-                                   preProcIncidentsDf
-                                   )
-    incidentsDf.index = range(len(incidentsDf))
-    if debug_flag == 1:
-        print('Length = ' + str(len(incidentsDf)));
-    
-    # Processing the downloaded report to parse BPM status from the Subject column.
-    # Example data in the Subject column: 48630947 - Outfitter Country [REVIEW]
-    # BPM Status = REVIEW.
-    if debug_flag == 1:
-        print('Processing the pending report to parse BPM status from the Subject column.');
-    incidentsDf['BPM Status'] = incidentsDf['Subject'].apply(bpmStatus);
-
-    if debug_flag == 1:
-        print('### End: prepPendingIncidentsFile function ###')
-    return incidentsDf;
-
-def prepCompletedIncidentsFile(debug_flag):
-    if debug_flag == 1:
-        print('### Start: prepCompletedIncidentsFile function ###');
-
-    abIncidentsDf = pd.read_csv(abDirPath + '/TnS_Analytics_Items_AUTO_BLOCK ' + yesterdayFormattedDate + '.txt',
-                                sep = '\t'
-                                )
-    muIncidentsDf = pd.read_csv(muDirPath + '/TnS_Analytics_Items_MANUAL_UPDATES ' + yesterdayFormattedDate + '.txt',
-                                sep = '\t'
-                                )
-
-    stitchedDf = pd.concat([abIncidentsDf,
-                            muIncidentsDf
-                            ],
-                           ignore_index = True
-                           )
-    stitchedDf.index = range(len(stitchedDf))
-
-    # Pre-processing the current month's incidents  and storing them in a data frame.
-    if debug_flag == 1:
-        print('Pre-processing today\'s incidents and storing them in a data frame.');
-    preProcIncidentsDf = preProcessIncidents(debug_flag,
-                                             stitchedDf
-                                             )
-    
-    if debug_flag == 1:
-        print('Adding new attributes to today\'s incidents and creating an incident file.');
-    incidentsDf = addNewAttributes(debug_flag,
-                                   preProcIncidentsDf
-                                   )
-    incidentsDf.index = range(len(incidentsDf))
-    if debug_flag == 1:
-        print('Length of incidents in ' + '{0:%B}'.format(datetime.strptime(todayFormattedDate, '%m-%d-%Y').date()) + ' = ' + str(len(incidentsDf)));
-    
-    # Processing the downloaded report to parse BPM status from the Subject column.
-    # Example data in the Subject column: 48630947 - Outfitter Country [REVIEW]
-    # BPM Status = REVIEW.
-    if debug_flag == 1:
-        print('Processing the downloaded report to parse BPM status from the Subject column.');
-    incidentsDf['BPM Status'] = incidentsDf['Subject'].apply(bpmStatus);
-
-    if debug_flag == 1:
-        print('### End: prepCompletedIncidentsFile function ###')
-    return incidentsDf;
-
-def createTeradataTableFromRNWIncidents(debug_flag, incidentsDf, rulesFile, dailyIncidentsFileLink):
-    if debug_flag == 1:
-        print('### Start: createTeradataTableFromRNWIncidents function ###');
-
-    # Processing the downloaded file to parse Rule ID and Rule Name from the Rule Detail column.
-    if debug_flag == 1:
-        print('Processing the downloaded file to parse Rule ID and Rule Name from the Rule Detail column.');
-    incidentsDf['Rule Detail'] = incidentsDf['Rule Detail'].apply(ruleDetail)
-    incidentsDf['Rule Id'] = '0'
-
-    incidents1Df = incidentsDf[incidentsDf['Rule Detail'] != 'No Value']
-    incidents1Df['Rule ID']   = incidents1Df['Rule Detail'].apply(ruleId)
-    incidents1Df['Rule Name'] = incidents1Df['Rule Detail'].apply(ruleNamePattern1)
-
-    # Changing rule names with "No Value" to appropriate names.
-    incidents2Df = incidentsDf[incidentsDf['Rule Detail'] == 'No Value']
-    if debug_flag == 1:
-        print('Changing rule names with "No Value" to appropriate names.')
-    incidents2Df['Rule Id']     = incidents2Df['Rule Name'].apply(ruleId2)
-    incidents2Df['Rule Name']   = incidents2Df['Rule Name'].apply(ruleName)
-
-    incidentsDf = pd.concat([incidents1Df,
-                             incidents2Df
-                             ],
-                            axis = 0
-                            )
-
-    if debug_flag == 1:
-        print(incidentsDf.dtypes);
-
-    if debug_flag == 1:
-        print('Before removing unused columns: ')
-        print(incidentsDf.columns);
-
-    # Dropping unused columns.
-    if debug_flag == 1:
-        print('Dropping unused columns.');
-    incidentsDf = incidentsDf.drop(['Subject',
-                                    'Rule Detail'
-                                    ],
-                                   axis = 1
-                                   )
-    if debug_flag == 1:
-        print('After removing unused columns: ')
-        print(incidentsDf.columns)
-        print('Regular incidents file length = ' + str(len(incidentsDf)));
-
-    if debug_flag == 1:
-        print('After removing rows related to anomalies: ')
-        print('Length = ' + str(len(incidentsDf)))
-
-    if debug_flag == 1:
-        print('Before Date Change - Writing the intermediate data frame to the tab-delimited completed incidents file.');
-    incidentsDf.to_csv(dailyIncidentsFileLink,
-                       date_format = '%Y-%m-%d %H:%M:%S',
-                       header = False,
-                       sep = '\t',
-                       index = False
-                       )
-
-    # Changing timestamp from US/Central to US/Pacific (The timestamp is removed):
-    if debug_flag == 1:
-        print('Changing CT to PST - Date Created.');
-    incidentsDf['Date Created'] = incidentsDf['Date Created'].apply(pstDate)
-    if debug_flag == 1:
-        print('Changing CT to PST - Date Last Updated.');
-    incidentsDf['Date Last Updated'] = incidentsDf['Date Last Updated'].apply(pstDate)
-
-    if debug_flag == 1:
-        print('Date Change Complete - Writing the intermediate data frame to the tab-delimited completed incidents file.')
-        incidentsDf.to_csv(dailyIncidentsFileLink,
-                           date_format = '%Y-%m-%d %H:%M:%S',
-                           header = False,
-                           sep = '\t',
-                           index = False
-                           );
-
-    # Applying column formats to Rule ID.
-    if debug_flag == 1:
-        print('Applying column formats to Rule ID.');
-    incidentsDf['Rule ID'] = pd.to_numeric(incidentsDf['Rule ID'],
-                                           errors = 'coerce'
-                                           )
-
-    # Creating a column (weekDate) to display week start and end dates, FY Wk# and Month based on created date.
-    if debug_flag == 1:
-        print('Creating a column (weekDate) to display week start and end dates, FY Wk# and Month based on created date.')
-    incidentsDf['Week Date - Created'] = pd.to_datetime(incidentsDf['Date Created']).apply(weekDateUpdate)
-    incidentsDf['FY Wk # - Created']   = pd.to_datetime(incidentsDf['Date Created']).apply(weekNumUpdate)
-    incidentsDf['Month - Created']     = pd.to_datetime(incidentsDf['Date Created']).apply(monthNumUpdate)
-
-    # Creating a column (weekDate) to display week start and end dates, FY Wk# and Month based on updated date.
-    if debug_flag == 1:
-        print('Creating a column (weekDate) to display week start and end dates, FY Wk# and Month based on updated date.')
-    incidentsDf['Week Date - Updated'] = pd.to_datetime(incidentsDf['Date Last Updated']).apply(weekDateUpdate)
-    incidentsDf['FY Wk # - Updated']   = pd.to_datetime(incidentsDf['Date Last Updated']).apply(weekNumUpdate)
-    incidentsDf['Month - Updated']     = pd.to_datetime(incidentsDf['Date Last Updated']).apply(monthNumUpdate)
-
-    incidentsDf = incidentsDf[['Incident ID',
-                               'Assigned Account',
-                               'Category ID',
-                               'Date Created',
-                               'Date Last Updated',
-                               'Decision',
-                               'Item ID',
-                               'BPM Status',
-                               'Item Categories',
-                               'Policy Group',
-                               'Policy Name',
-                               'Reference #',
-                               'Seller Sourcing Channel',
-                               'Rule ID',
-                               'Rule Name',
-                               'Week Date - Created',
-                               'FY Wk # - Created',
-                               'Month - Created',
-                               'Week Date - Updated',
-                               'FY Wk # - Updated',
-                               'Month - Updated',
-                               'Item Title',
-                               'UPC',
-                               'GTIN'
-                               ]
-                              ]
-
-    if debug_flag == 1:
-        print('Before rule name column update - Writing the intermediate data frame to the tab-delimited completed incidents file.')
-        incidentsDf.to_csv(dailyIncidentsFileLink,
-                           date_format = '%Y-%m-%d %H:%M:%S',
-                           header = False,
-                           sep = '\t',
-                           index = False
-                           )
-
-    # Updating Rule Name to use the Rule Description.
-    if debug_flag == 1:
-        print('Updating Rule Name to use the Rule Description.');
-    incidentsDf = updateRuleName(debug_flag, rulesFile, incidentsDf)
-
-    if debug_flag == 1:
-        print('After rule name column update and before policy column update - Writing the intermediate data frame to the tab-delimited completed incidents file.')
-        incidentsDf.to_csv(dailyIncidentsFileLink,
-                           date_format = '%Y-%m-%d %H:%M:%S',
-                           header = False,
-                           sep = '\t',
-                           index = False
-                           );
-
-    # Updating Policy names.
-    if debug_flag == 1:
-        print('Updating Policy names.');
-    incidentsDf = updatePolicyName(debug_flag, incidentsDf)
-
-    # Starting the process to create the tab-delimited cumulative data frame.
-    if debug_flag == 1:
-        print('Starting the process to create the tab-delimited cumulative data frame.');
-    sortedDf = incidentsDf.sort_values(['Date Created',
-                                        'Reference #'
-                                        ]
-                                       )
-    # Creating the tab-delimited cumulative file.
-    if debug_flag == 1:
-        print('Creating the tab-delimited cumulative file.');
-    sortedDf = sortedDf[['Incident ID',
-                         'Assigned Account',
-                         'Category ID',
-                         'Date Created',
-                         'Date Last Updated',
-                         'Decision',
-                         'Item Categories',
-                         'Policy Group',
-                         'Policy Name',
-                         'Reference #',
-                         'Seller Sourcing Channel',
-                         'Item ID',
-                         'BPM Status',
-                         'Rule ID',
-                         'Rule Name',
-                         'Week Date - Created',
-                         'FY Wk # - Created',
-                         'Month - Created',
-                         'Week Date - Updated',
-                         'FY Wk # - Updated',
-                         'Month - Updated',
-                         'Item Title',
-                         'UPC',
-                         'GTIN'
-                         ]
-                        ]
-    if debug_flag == 1:
-        print('After policy column update and before priority column update - Writing the intermediate data frame to the tab-delimited completed incidents file.')
-        sortedDf.to_csv(dailyIncidentsFileLink,
-                        date_format = '%Y-%m-%d %H:%M:%S',
-                        header = False,
-                        sep = '\t',
-                        index = False
-                        );
-
-    # Adding Priority column.
-    sortedDf = createPriorityColumn(debug_flag, rulesFile, incidentsDf)
-
-    sortedDf = sortedDf[['Incident ID',
-                         'Assigned Account',
-                         'Category ID',
-                         'Date Created',
-                         'Date Last Updated',
-                         'Decision',
-                         'Item Categories',
-                         'Policy Group',
-                         'Policy Name',
-                         'Reference #',
-                         'Seller Sourcing Channel',
-                         'Item ID',
-                         'BPM Status',
-                         'Rule ID',
-                         'Rule Name',
-                         'Priority',
-                         'Week Date - Created',
-                         'FY Wk # - Created',
-                         'Month - Created',
-                         'Week Date - Updated',
-                         'FY Wk # - Updated',
-                         'Month - Updated',
-                         'Item Title',
-                         'UPC',
-                         'GTIN'
-                         ]
-                        ]
-
-    if debug_flag == 1:
-        print('After priority column update - Writing the intermediate data frame to the tab-delimited completed incidents file.')
-        sortedDf.to_csv(dailyIncidentsFileLink,
-                        date_format = '%Y-%m-%d %H:%M:%S',
-                        header = False,
-                        sep = '\t',
-                        index = False
-                        );
-
-    if debug_flag == 1:
-        print('### End: createTeradataTableFromRNWIncidents function ###');
-    return sortedDf;
-
-def saveTdDfToFile(debug_flag, pending_flag, sortedDf, dailyIncidentsFileLink, tdFileLink, ptdFileLink):
-    if debug_flag == 1:
-        print('### Start: saveTdDfToFile function ###');
-
-    if pending_flag == 1:
-        if debug_flag == 1:
-            print('Writing the final data frame to today\'s tab-delimited pending incidents file.');
-        sortedDf.to_csv(tdFileLink,
-                        date_format = '%Y-%m-%d %H:%M:%S',
-                        header = False,
-                        sep = '\t',
-                        index = False
-                        );
-        sortedDf.to_csv(ptdFileLink,
-                        date_format = '%Y-%m-%d %H:%M:%S',
-                        header = False,
-                        sep = '\t',
-                        index = False
-                        );
-    else:
-        if debug_flag == 1:
-            print('Writing the final data frame to today\'s tab-delimited completed incidents file.');
-        sortedDf.to_csv(dailyIncidentsFileLink,
-                        date_format = '%Y-%m-%d %H:%M:%S',
-                        header = False,
-                        sep = '\t',
-                        index = False
-                        )
-    
-        # Stitching together today's incidents with all Incidents.
-        if debug_flag == 1:
-            print('Stitching together today\'s completed incidents with all prior completed incidents.');
-        with open(tdFileLink, 'at') as outfile:
-            with open(dailyIncidentsFileLink, 'rt') as infile:
-                    outfile.write(infile.read());
-        with open(ptdFileLink, 'at') as outfile:
-            with open(dailyIncidentsFileLink, 'rt') as infile:
-                    outfile.write(infile.read());
-
-    if debug_flag == 1:
-        print('### End: saveTdDfToFile function ###');
 
 recvMailFormat = lambda emailAddr: "{} ".format(emailAddr.split(' <')[0],
                                                 emailAddr
@@ -2345,7 +1278,6 @@ recvMailFormat = lambda emailAddr: "{} ".format(emailAddr.split(' <')[0],
 def sendReportViaEmail(debug_flag, messageFile):
     if debug_flag == 1:
         print('### Start: sendReportViaEmail function ###');
-
     emailMessage  = ''
     with open(messageFile, 'r') as msgFile:
         emailMessage  = msgFile.read()
@@ -2369,7 +1301,7 @@ def sendReportViaEmail(debug_flag, messageFile):
             emailAddrList.append(ccEmails);
  
     # Send the message via local SMTP server.
-    session = smtplib.SMTP('smtp-gw1.wal-mart.com')
+    session = smtplib.SMTP('<local smtp server>')
     # sendmail function takes 3 arguments:
     # (1) Sender's e-mail address
     # (2) Recipient's e-mail address
@@ -2715,27 +1647,27 @@ def genBaseDataWorksheet(debug_flag, fyYyNum, numberHoursWorkedPerDay, holidaysP
     if debug_flag == 1:
         print('### End: genBaseDataWorksheet function ###');
 
-def genItemsPivotTableWorksheet(debug_flag, yearNum, holidaysPerMonth, XLSXFILE):
+def genAttrPivotTableWorksheet(debug_flag, yearNum, holidaysPerMonth, XLSXFILE):
     if debug_flag == 1:
-        print('### Start: genItemsPivotTableWorksheet function ###');
+        print('### Start: genAttrPivotTableWorksheet function ###');
 
     ################### Create the content of the work-sheet ######################
 
-    marketPlaceTotal     = {}
-    marketPlaceAutoBlock = {}
-    marketPlaceReview    = {}
-    ownedTotal     = {}
-    ownedAutoBlock = {}
-    ownedReview    = {}
+    Attr1Dict = {}
+    Attr2Dict = {}
+    Attr3Dict = {}
+    Attr4Dict = {}
+    Attr5Dict = {}
+    Attr6Dict = {}
     forecastDfColNames = list(holidaysPerMonth)
     forecastDfColNames.append('FY ' + str(yearNum + 1) + ' (YTD)')
 
-    forecastDf = pd.DataFrame(index = ['Marketplace',
-                                       'AUTO BLOCK',
-                                       'REVIEW',
-                                       'Owned',
-                                       'AUTO BLOCK',
-                                       'REVIEW'
+    forecastDf = pd.DataFrame(index = ['<Attr 1 Val>',
+                                       '<Attr 2 Val>',
+                                       '<Attr 3 Val>',
+                                       '<Attr 4 Val>',
+                                       '<Attr 5 Val>',
+                                       '<Attr 6 Val>'
                                        ],
                               columns = forecastDfColNames
                               )
@@ -2760,72 +1692,72 @@ def genItemsPivotTableWorksheet(debug_flag, yearNum, holidaysPerMonth, XLSXFILE)
             endDate   = date(yearVal, monthVal, numDays).strftime('%Y-%m-%d')
             subQueryBegin = 'SELECT COUNT(*) AS Total FROM ' + \
                              TDSBOXNAME + '.' + TDVIEWNAME
-            subQueryEnd   = ' AND CAST(Date_Created AS DATE) >= \'' + \
+            subQueryEnd   = ' AND CAST(<Date Attr> AS DATE) >= \'' + \
                             startDate + \
-                            '\' AND CAST(Date_Created AS DATE) <= \'' + \
+                            '\' AND CAST(<Date Attr> AS DATE) <= \'' + \
                             endDate + '\');'
-            # Marketplace Total
-            mpSubQuery      = ' WHERE (Seller_Sourcing_Channel = \'Marketplace\''
-            mpQueryResults  = subQueryBegin + mpSubQuery + subQueryEnd
-            mpQueryResultDf = pd.read_sql(mpQueryResults,
-                                          session
-                                          );
-            marketPlaceTotal[colName] = int(mpQueryResultDf['Total'])
-            # Marketplace - AUTO BLOCK
-            mpAbSubQuery = ' AND BPM_Status = \'AUTO BLOCK\''
-            mpAbQueryResults = subQueryBegin + mpSubQuery + mpAbSubQuery + subQueryEnd
-            mpAbQueryResultDf = pd.read_sql(mpAbQueryResults,
-                                            session
-                                            );
-            marketPlaceAutoBlock[colName] = int(mpAbQueryResultDf['Total'])
-            # Marketplace - REVIEW
-            mpRvSubQuery = ' AND BPM_Status = \'REVIEW\''
-            mpRvQueryResults = subQueryBegin + mpSubQuery + mpRvSubQuery + subQueryEnd
-            mpRvQueryResultDf = pd.read_sql(mpRvQueryResults,
-                                            session
-                                            );
-            marketPlaceReview[colName] = int(mpRvQueryResultDf['Total'])
-            # Owned Total
-            ownedSubQuery      = ' WHERE (Seller_Sourcing_Channel = \'Owned\''
-            ownedQueryResults  = subQueryBegin + ownedSubQuery + subQueryEnd
-            ownedQueryResultDf = pd.read_sql(ownedQueryResults,
+            # Attr 1 - Attr 1 Val
+            attr1SubQuery      = ' WHERE (<Attr 1 Name> = \'<Attr 1 Val>\''
+            attr1QueryResults  = subQueryBegin + attr1SubQuery + subQueryEnd
+            attr1QueryResultDf = pd.read_sql(attr1QueryResults,
                                              session
-                                            );
-            ownedTotal[colName] = int(ownedQueryResultDf['Total'])
-            # Owned - AUTO BLOCK
-            ownedAbSubQuery = ' AND BPM_Status = \'AUTO BLOCK\''
-            ownedAbQueryResults = subQueryBegin + ownedSubQuery + ownedAbSubQuery + subQueryEnd
-            ownedAbQueryResultDf = pd.read_sql(ownedAbQueryResults,
-                                               session
-                                               );
-            ownedAutoBlock[colName] = int(ownedAbQueryResultDf['Total'])
-            # Owned - REVIEW
-            ownedRvSubQuery = ' AND BPM_Status = \'REVIEW\''
-            ownedRvQueryResults = subQueryBegin + ownedSubQuery + ownedRvSubQuery + subQueryEnd
-            ownedRvQueryResultDf = pd.read_sql(ownedRvQueryResults,
-                                               session
-                                               );
-            ownedReview[colName] = int(ownedRvQueryResultDf['Total']);
+                                             );
+            Attr1Dict[colName] = int(attr1QueryResultDf['Total'])
+            # Attr 2 - Attr 2 Val
+            attr2SubQuery = ' AND <Attr 2 Name> = \'<Attr 2 Val>\''
+            attr2QueryResults = subQueryBegin + attr2SubQuery + attr2SubQuery + subQueryEnd
+            attr2QueryResultDf = pd.read_sql(attr2QueryResults,
+                                             session
+                                             );
+            Attr2Dict[colName] = int(attr2QueryResults['Total'])
+            # Attr 3 - Attr 3 Val
+            attr3SubQuery = ' AND <Attr 3 Name> = \'<Attr 3 Val>\''
+            attr3QueryResults = subQueryBegin + attr3SubQuery + attr3SubQuery + subQueryEnd
+            attr3QueryResultDf = pd.read_sql(attr3QueryResults,
+                                             session
+                                             );
+            Attr3Dict[colName] = int(attr3QueryResults['Total'])
+            # Attr 4 - Attr 4 Val
+            attr4SubQuery      = ' WHERE (<Attr 4 Name> = \'<Attr 4 Val>\''
+            attr4QueryResults  = subQueryBegin + attr4SubQuery + subQueryEnd
+            attr4QueryResultDf = pd.read_sql(attr4QueryResults,
+                                             session
+                                             );
+            Attr4Dict[colName] = int(attr4QueryResultDf['Total'])
+            # Attr 5 - Attr 5 Val
+            attr5SubQuery = ' AND <Attr 5 Name> = \'<Attr 5 Val>\''
+            attr5QueryResults = subQueryBegin + attr5SubQuery + attr5SubQuery + subQueryEnd
+            attr5QueryResultDf = pd.read_sql(attr5QueryResults,
+                                             session
+                                             );
+            Attr5Dict[colName] = int(attr5QueryResults['Total'])
+            # Attr 6 - Attr 6 Val
+            attr6SubQuery = ' AND <Attr 6 Name> = \'<Attr 6 Val>\''
+            attr6QueryResults = subQueryBegin + attr6SubQuery + attr6SubQuery + subQueryEnd
+            attr6QueryResultDf = pd.read_sql(attr6QueryResults,
+                                             session
+                                             );
+            Attr6Dict[colName] = int(attr6QueryResults['Total'])
         # Closing Teradata connection.
         if debug_flag == 1:
             print('Closing the Teradata connection.');
         cursor.close();
 
     for colName in holidaysPerMonth.keys():
-        forecastDf[colName] = [marketPlaceTotal[colName],
-                               marketPlaceAutoBlock[colName],
-                               marketPlaceReview[colName],
-                               ownedTotal[colName],
-                               ownedAutoBlock[colName],
-                               ownedReview[colName]
+        forecastDf[colName] = [Attr1Dict[colName],
+                               Attr2Dict[colName],
+                               Attr3Dict[colName],
+                               Attr4Dict[colName],
+                               Attr5Dict[colName],
+                               Attr6Dict[colName]
                                ]
 
-    forecastDf['FY ' + str(yearNum + 1) + ' (YTD)'] = [sum(marketPlaceTotal.values()),
-                                                       sum(marketPlaceAutoBlock.values()),
-                                                       sum(marketPlaceReview.values()),
-                                                       sum(ownedTotal.values()),
-                                                       sum(ownedAutoBlock.values()),
-                                                       sum(ownedReview.values())
+    forecastDf['FY ' + str(yearNum + 1) + ' (YTD)'] = [sum(Attr1Dict.values()),
+                                                       sum(Attr2Dict.values()),
+                                                       sum(Attr3Dict.values()),
+                                                       sum(Attr4Dict.values()),
+                                                       sum(Attr5Dict.values()),
+                                                       sum(Attr6Dict.values())
                                                        ]
 
     # Create a pandas xlsx writer using openpyxl as the engine.
@@ -2839,7 +1771,7 @@ def genItemsPivotTableWorksheet(debug_flag, yearNum, holidaysPerMonth, XLSXFILE)
     pd.formats.format.header_style = None
 
     # Set the sheet name.
-    sheetName = 'Items - Pivot Table'
+    sheetName = '<Attr Name> - Pivot Table'
 
     # Convert the final data frame to an XlsxWriter excel object.
     # startrow and startcol need to be 0-indexed.
@@ -2866,5 +1798,5 @@ def genItemsPivotTableWorksheet(debug_flag, yearNum, holidaysPerMonth, XLSXFILE)
                                )
 
     if debug_flag == 1:
-        print('### End: genItemsPivotTableWorksheet function ###');
+        print('### End: genAttrPivotTableWorksheet function ###');
 
