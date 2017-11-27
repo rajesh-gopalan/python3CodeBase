@@ -60,4 +60,4 @@ newArray, resultFlag = insertNewElement(DEBUG, arrayVal, newElement)
 if resultFlag:
     print('Updated array  = ', str(newArray));
 else:
-    print('Error!  Something went wrong.');
+    print('Erorr: Please satisfy requirements.');
